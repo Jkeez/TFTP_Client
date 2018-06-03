@@ -6,6 +6,7 @@
 package graph;
 
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -105,15 +106,19 @@ public class GrapheDSat extends Graphe implements Comparator<Sommet>{
     }
     
     
-    public static void main(String[] args){
+    public static void main(String[] args) throws IOException{
+        lectureFichier lecteur= new lectureFichier();
+        
         GrapheDSat g=new GrapheDSat();
-        g.ajouterSommet(new Sommet(1, 0));
-        g.ajouterSommet(new Sommet(2, 0));
-        g.ajouterSommet(new Sommet(3, 0));
-        g.ajouterArete(new Arete(g.sommets.get(0),g.sommets.get(1) ));
-        g.ajouterArete(new Arete(g.sommets.get(2),g.sommets.get(0) ));
-        g.ajouterArete(new Arete(g.sommets.get(1),g.sommets.get(2) ));
+        for (int i = 0; i <= lecteur.getListeSommets().size()-1; i++) {
+            g.ajouterSommet(lecteur.getListeSommets().get(i));
+        }
+        for (int i = 0; i <= lecteur.getListeAretes().size() - 1; i++) {
+            g.ajouterArete(lecteur.getListeAretes().get(i));
+        }
+      
         g.colorier();
         System.out.print(g.toString());
+
     }
 }
