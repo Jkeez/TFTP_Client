@@ -87,7 +87,7 @@ public class Graphe {
     public String toString(){
         String tmp="";
         for(int i=0;i<sommets.size();i++){
-            tmp+=sommets.get(i);
+            tmp+="Sommet: "+sommets.get(i).getNumero()+" Degree: "+sommets.get(i).getDegree()+" Couleur: "+sommets.get(i).getCouleur()+"\n";
         }
         return tmp;
 
