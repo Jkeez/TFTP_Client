@@ -30,7 +30,7 @@ public class TFTP_Client {
     private static final byte OP_ACK = 4;
     private static final byte OP_ERROR = 5;
 
-    private final static int TAILLE_PAQUET = 512;
+    private final static int TAILLE_PAQUET = 516;
 
     private DatagramSocket datagramSocket = null;
     private InetAddress inetAddress = null;
@@ -47,12 +47,13 @@ public class TFTP_Client {
         //creation du datagramPacket a envoyer avec la RRQ
         datagramPacket_sortie = new DatagramPacket(requestByteArray,
                 requestByteArray.length, inetAddress, TFTP_DEFAULT_PORT);
+        //ETAPE 1: envoi du datagramme
         datagramSocket.send(datagramPacket_sortie);
 
-        //attend la reponse du serveur, recupere la reponse depuis un flot avec filtrage (permet d'avoir plusieurs paquets
+        //ETAPE 2: attend la reponse du serveur, recupere la reponse depuis un flot avec filtrage (permet d'avoir plusieurs paquets)
         ByteArrayOutputStream byteOutOS = receiveFile();
 
-        // ETAPE3: : ecriture du fichier sur le disque local
+        //ETAPE 3: ecriture du fichier sur le disque local
         writeFile(byteOutOS, fileName);
     }
 
@@ -72,28 +73,40 @@ public class TFTP_Client {
             System.out.println("IP reception: " + inetAddress + " port: " + datagramSocket.getLocalPort());
             //ETAPE 2.1: le client attend un paquet du serveur 
             datagramSocket.receive(datagramPacket_entree);
-            // Recupere le code operatoire
+            // Recupere le code operatoire 2 premiers octets du DATA
             byte[] opCode = {bufferByteArray[0], bufferByteArray[1]};
 
             if (opCode[1] == OP_ERROR) {//s'il s'agit d'un OP Error on la reporte
-                //reportError();
-                System.out.println("erreur ");
+                rapportErreur();
             } else if (opCode[1] == OP_DATAPACKET) {//s'il s'agit d'un paquet de donnee
-                // recupere le numero de block
+                // recupere le numero de block (sur 2 octets), 3 et 4 eme octets
                 byte[] numeroBlock = {bufferByteArray[2], bufferByteArray[3]};
 
                 //ecrit les donnees sur le flot de sortie
                 DataOutputStream dos = new DataOutputStream(byteOutOS);
                 //ecriture du contenu du paquet
+                System.out.println("");
+                //DATA contient le code operatoire ainsi que le numero de blocs qui occupent 4 octets
+                //on ecrit donc les donnes a partir du 4eme octets les 512 octets de donnees max.
                 dos.write(datagramPacket_entree.getData(), 4,
-                        datagramPacket_entree.getLength() - 4);
+                        datagramPacket_entree.getLength()-4);
+                System.out.println("ecriture de "+(datagramPacket_entree.getLength()-4)+" octets");
 
                 //ETAPE 2.2: envoi acquitement au serveur
                 sendAcknowledgment(numeroBlock);
             }
 
-        } while (datagramPacket_entree.getLength() < 512);
+        } while (datagramPacket_entree.getLength() >= TAILLE_PAQUET);
         return byteOutOS;
+    }
+
+    //extrait l'erreur du datagramme puis l'affiche
+    private void rapportErreur() {
+        //OPerror contient le code operatoire (5) sur les 2 premiers octets
+        String errorCode = new String(bufferByteArray, 3, 1);
+        String errorText = new String(bufferByteArray, 4,
+                datagramPacket_entree.getLength() - 4);
+        System.err.println("Erreur: " + errorCode + " " + errorText);
     }
 
     //ecriture du fichier recu
@@ -109,6 +122,7 @@ public class TFTP_Client {
 
     private void sendAcknowledgment(byte[] blockNumber) {
 
+        //paquet ACK compose du code operatoire (0) et du numero du bloc a acquite
         byte[] ACK = {0, OP_ACK, blockNumber[0], blockNumber[1]};
 
         // Server TFTP communique en retour via un nouveau port
@@ -116,6 +130,7 @@ public class TFTP_Client {
         // puis on envoi l'acquitement
         DatagramPacket ack = new DatagramPacket(ACK, ACK.length, inetAddress,
                 datagramPacket_entree.getPort());
+        System.out.println("Envoi ACK sur port: " + datagramPacket_entree.getPort());
         try {
             datagramSocket.send(ack);
         } catch (IOException e) {
@@ -124,55 +139,42 @@ public class TFTP_Client {
     }
 
     /*
-	 * RRQ / WRQ packet format
+	 * format generique : RRQ / WRQ 
 	 * 
-	 * 2 bytes - Opcode; string - filename; 1 byte - 0; string - mode; 1 byte -
+	 * 2 bytes - Opcode; string - nom du fichier; 1 byte - 0; string - mode; 1 byte -
 	 * 0;
      */
     byte[] creerRequete(byte opCode, String nomFichier, String mode) {
-        //initialisation buffers
-        //zeroByte stock un byte correspondant a la valeur 0 de la RRQ/WRQ
-        byte[] zeroByte = new byte[1];
-        zeroByte[0] = (byte) 0;
-        //opCodeByte stock un byte correspondant au code operatoire
-        byte[] opCodeByte = new byte[1];
-        opCodeByte[0] = opCode;
+        
+        //taille buffer= 1 (0) + 1 (opcode) + longueur de nomFichier + 1 (0) + longueur du mode + 1 (0)
+        int longueurBufferRequete = 2 + nomFichier.length() + 1 + mode.length() + 1;
+        //initialise le buffer contenant la requete
+        byte[] rrq_buffer = new byte[longueurBufferRequete];
 
-        //buffer contenant la RRQ en byte
-        byte[] rrq = new byte[512];
-
-        //creer le buffer content le nom du fichier
-        int longueurNomFichier = (byte) nomFichier.length();
-        byte[] nomFichierByte = new byte[longueurNomFichier];
-        nomFichierByte = nomFichier.getBytes();
-
-        //creer le buffer contenant le mode
-        int longueurMode = (byte) nomFichier.length();
-        byte[] ModeByte = new byte[longueurMode];
-        ModeByte = nomFichier.getBytes();
-
-        //Creation de la requete en assemblant chaque buffer
-        int pos = 0;
-        //ajout du 0
-        System.arraycopy(zeroByte, 0, rrq, pos, 1);
-        pos = 1;
-        //ajout du code operatoire
-        System.arraycopy(opCodeByte, 0, rrq, pos, 1);
-        pos = 2;
-        //ajout du nom du fichier
-        System.arraycopy(nomFichierByte, 0, rrq, pos, nomFichierByte.length);
-        pos = pos + nomFichierByte.length;
-        //ajout du 0
-        System.arraycopy(zeroByte, 0, rrq, pos, 1);
-        pos = pos + 1;
-        //ajout du mode
-        System.arraycopy(ModeByte, 0, rrq, pos, ModeByte.length);
-        pos = pos + ModeByte.length;
-        //ajout du 0
-        System.arraycopy(zeroByte, 0, rrq, pos, 1);
-        pos = pos + ModeByte.length;
-
-        return rrq;
+        //position dans le buffer afin de le remplir
+        int position = 0;
+        //ajoute l'octet 0
+        rrq_buffer[position] = (byte)0;
+        position++;
+        //ajoute le code operatoire
+        rrq_buffer[position] = opCode;
+        position++;
+        //ajoute octet par octet le nom du fichier a demander
+        for (int i = 0; i < nomFichier.length(); i++) {
+            rrq_buffer[position] = (byte) nomFichier.charAt(i);
+            position++;
+        }
+        //ajoute l'octet 0
+        rrq_buffer[position] = (byte)0;
+        position++;
+        //ajoute octet par octet le nom du mode
+        for (int i = 0; i < mode.length(); i++) {
+            rrq_buffer[position] = (byte) mode.charAt(i);
+            position++;
+        }
+        //ajoute l'octet 0
+        rrq_buffer[position] = (byte)0;
+        return rrq_buffer;
     }
 
     public static void main(String[] args) throws IOException {
