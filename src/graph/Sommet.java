@@ -14,6 +14,7 @@ public class Sommet {
     private int numero;
     private int couleur;
     private int degree;
+    private int degreeSaturee;
 
     public Sommet(int numero, int couleur) {
         this.setNumero(numero);
@@ -42,6 +43,14 @@ public class Sommet {
 
     public void setDegree(int degree) {
         this.degree = degree;
+    }
+
+    public int getDegreeSaturee() {
+        return degreeSaturee;
+    }
+
+    public void setDegreeSaturee(int degreeSaturee) {
+        this.degreeSaturee = degreeSaturee;
     }
 
     //permet de déterminer si deux sommets sont différents

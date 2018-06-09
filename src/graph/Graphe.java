@@ -74,6 +74,7 @@ public class Graphe {
         }
         return col;
     }
+    
     //calcul le degree du sommet
     public int degree(Sommet s){
         int degree=this.getSommetsEnRelation(s).size();

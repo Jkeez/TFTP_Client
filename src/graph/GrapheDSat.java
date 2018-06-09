@@ -24,23 +24,32 @@ public class GrapheDSat extends Graphe implements Comparator<Sommet>{
     }
     //recuperer le dSat du sommet s
     public int dSat(Sommet s){
-        
         if(s==null) return -1;
         
         Iterator<Sommet> it= getSommetsEnRelation(s).iterator();
         //HashSet permet de ne pas avoir de doublons
         HashSet<Integer> couleurDifferente=new HashSet<Integer>();
         
+        
         while(it.hasNext()){
             Sommet voisin=it.next();
-            if(s.getCouleur()!=0) 
+            if(voisin.getCouleur()!=0) {
                 couleurDifferente.add(voisin.getCouleur());
+            }
+                
+        }
+        if(s.getNumero()==0){
+            
+            for(int i=0;i<=couleurDifferente.size()-1;i++)System.out.println(couleurDifferente.iterator().next().toString());
         }
         // si aucun de ces voisin n'est coloriés , alors Dsat= degré
-        if(couleurDifferente.size()==0) 
+        if(couleurDifferente.size()==0){ 
+            s.setDegreeSaturee(s.getDegree());
             return degree(s);
+        }
         
-        else //dsat=nb de couleurs différente 
+        else //dsat=nb de couleurs différente
+            s.setDegreeSaturee(couleurDifferente.size());
             return couleurDifferente.size();
     }
     
@@ -73,10 +82,12 @@ public class GrapheDSat extends Graphe implements Comparator<Sommet>{
     
     public void colorier(){
         //premier étape: Ordonner les sommets par ordre décroissant de degrés.
-        Collections.sort(sommets,this);
+        //Collections.sort(sommets,this);
+        sommets.sort(Comparator.comparing(Sommet::getDegree).reversed());
         //deuxieme étape: recuperer tout les sommets dans une liste
         grapheSommetNonColorie=new LinkedList<Sommet>();
         grapheSommetNonColorie.addAll(sommets);
+       
         //colorier le sommet ayant le plus grand degrés avec la première couleur
         Sommet s=grapheSommetNonColorie.get(0);
         //on colorie avec la plus petite couleur
@@ -85,24 +96,36 @@ public class GrapheDSat extends Graphe implements Comparator<Sommet>{
         grapheSommetNonColorie.remove(0);
         
         //on boucle pour réaliser ce processus jusqu'a ce que tout les sommets soit coloriés
-        Collections.sort(grapheSommetNonColorie,this);
+        //grapheSommetNonColorie.sort(Comparator.comparing(Sommet::getDegreeSaturee).reversed());
+        majDSat(grapheSommetNonColorie);
+        Collections.sort(grapheSommetNonColorie, this);
+        
+        
         while(grapheSommetNonColorie.size()>0){
             s=grapheSommetNonColorie.get(0);
             Collection<Sommet> col=getSommetsEnRelation(s);
             int ppc=plusPetiteCouleur(col);
             s.setCouleur(ppc);
             grapheSommetNonColorie.remove(0);
-            Collections.sort(grapheSommetNonColorie,this);
+            majDSat(grapheSommetNonColorie);
+            grapheSommetNonColorie.sort(Comparator.comparing(Sommet::getDegreeSaturee).reversed());
         }
     }
     
-    
+    public void majDSat(List<Sommet> som){
+         for (int i = 0; i <= som.size()-1; i++) {
+           som.get(i).setDegreeSaturee(dSat(som.get(i)));
+        }
+    }
     //compare deux objets selon leurs degrés. Le max sera mit en priorité.
     public int compare(Sommet o1, Sommet o2) {
-        if(dSat(o2)-dSat(o1)!=0)
-            return dSat(o2)-dSat(o1);
-        else 
-            return this.degree(o2)-this.degree(o1);
+        if(o2.getDegreeSaturee()<o1.getDegreeSaturee())
+            
+            return -1;
+        else if(o1.getDegreeSaturee()<o2.getDegreeSaturee())return 1;
+        else{
+        } 
+            return -1 * Integer.compare(o1.getDegree(), o2.getDegree());
     }
     
     
@@ -115,6 +138,11 @@ public class GrapheDSat extends Graphe implements Comparator<Sommet>{
         }
         for (int i = 0; i <= lecteur.getListeAretes().size() - 1; i++) {
             g.ajouterArete(lecteur.getListeAretes().get(i));
+        }
+        //calcul des degrees de chaque sommets et du degree saturee
+        for (int i = 0; i <= g.getSommets().size()-1; i++) {
+            g.degree(g.getSommets().get(i));
+            g.getSommets().get(i).setDegreeSaturee(g.dSat(g.getSommets().get(i)));
         }
       
         g.colorier();
